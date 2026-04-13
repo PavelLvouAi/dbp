@@ -1,24 +1,25 @@
+version: '3.7'
 services:
-  db8:
-    image: mysql:8.0.28
-    environment:
-      - MYSQL_ALLOW_EMPTY_PASSWORD=1
-      - MYSQL_DATABASE=${DB_CONNECTION}
-    ports:
-      - '${DBP_PORT}:3306'
-    volumes:
-      - 'mysql_data8:/var/lib/mysql'
+  # db8:
+  #   image: mysql:8.0.28
+  #   environment:
+  #     - MYSQL_ALLOW_EMPTY_PASSWORD=1
+  #     - MYSQL_DATABASE=${DB_CONNECTION}
+  #   ports:
+  #     - '${DBP_PORT}:3306'
+  #   volumes:
+  #     - 'mysql_data8:/var/lib/mysql'
 
-  dbpusers8:
-    image: mysql:8.0.33
-    container_name: dbpusers8
-    environment:
-      - MYSQL_ALLOW_EMPTY_PASSWORD=1
-      - MYSQL_DATABASE=${DB_USERS_CONNECTION}
-    ports:
-      - '${DBP_USERS_PORT}:3306'
-    volumes:
-      - 'mysql_dbpusers8:/var/lib/mysql'
+  # dbpusers8:
+  #   image: mysql:8.0.33
+  #   container_name: dbpusers8
+  #   environment:
+  #     - MYSQL_ALLOW_EMPTY_PASSWORD=1
+  #     - MYSQL_DATABASE=${DB_USERS_CONNECTION}
+  #   ports:
+  #     - '${DBP_USERS_PORT}:3306'
+  #   volumes:
+  #     - 'mysql_dbpusers8:/var/lib/mysql'
 
   php:
     build:
@@ -28,9 +29,12 @@ services:
     volumes:
       - './:/opt/app'
       - ./docker/php/phpSettings.conf:/usr/local/etc/php-fpm.d/zzz-phpSettings.conf
-    depends_on:
-      - db8
-      - dbpusers8
+    environment:
+      # package-create API URL (override in .env if service runs on host)
+      - PACKAGE_CREATE_URL=${PACKAGE_CREATE_URL:-http://localhost:5044/package/create}
+    # depends_on:
+    #   - db8
+    #   - dbpusers8
 
   server:
     image: nginx:stable-alpine
@@ -47,6 +51,34 @@ services:
     ports:
       - '${MEMCACHED_PORT}:11211'
 
-volumes:
-  mysql_data8:
-  mysql_dbpusers8:
+  rds-tunnel:
+    build:
+      context: .
+      dockerfile: docker/rds/Dockerfile
+    environment:
+      AWS_PROFILE: dbp-dev
+      AWS_REGION: us-west-2
+      INSTANCE_ID: i-0d302fa57aacf480d
+      RDS_HOST: biblebrain-contentdev-aurora-serverless-t7h8.c43uzts2g90s.us-west-2.rds.amazonaws.com
+    volumes:
+      - ~/.aws:/root/.aws:ro
+    ports:
+      - '3307:3306'
+
+  rds-users-tunnel:
+    build:
+      context: .
+      dockerfile: docker/rds/DockerUsersFile
+    environment:
+      AWS_PROFILE: dbp-dev
+      AWS_REGION: us-west-2
+      INSTANCE_ID: i-0d302fa57aacf480d
+      RDS_HOST: biblebrain-dev-rds-users.cluster-c43uzts2g90s.us-west-2.rds.amazonaws.com
+    volumes:
+      - ~/.aws:/root/.aws:ro
+    ports:
+      - '3308:3306'
+
+# volumes:
+#   mysql_data8:
+  # mysql_dbpusers8:
